@@ -15,5 +15,14 @@
     "express": "^4.17.1",
     "mongoose": "^5.12.3",
     "mongoose-encryption": "^2.1.0"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/azatseyrek/secret-login.git"
+  },
+  "bugs": {
+    "url": "https://github.com/azatseyrek/secret-login/issues"
+  },
+  "homepage": "https://github.com/azatseyrek/secret-login#readme"
 }
