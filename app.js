@@ -5,8 +5,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const ejs = require('ejs');
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
-const saltRounds = 10;
+const session = require('express-session');
+const passport = require('passport');
+const passportLocalMongoose = require('passport-local-mongoose');
 
 const app = express();
 
@@ -16,6 +17,15 @@ app.use(bodyParser.urlencoded({
     extended: true
 }));
 
+app.use(session({
+    secret: 'Our little secret.',
+    resave: false,
+    saveUninitialized: true,
+}));
+
+app.use(passport.initialize());
+app.use(passport.session());
+
 //DB kullanimi //
 //1.Adim DB connect
 
@@ -23,7 +33,7 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
     useNewUrlParser: true,
     useUnifiedTopology: true
 });
-
+mongoose.set('useCreateIndex', true);
 //2.Adim Schema Olustur
 // const userSchema = {
 //     email: String,
@@ -32,20 +42,23 @@ mongoose.connect("mongodb://localhost:27017/userDB", {
 
 //sifreleme icin semaya new mongoose.Schema ekliyoruz
 const userSchema = new mongoose.Schema({
-        email: String,
-        password: String
-    
+    email: String,
+    password: String
+
 });
 
+userSchema.plugin(passportLocalMongoose);
+
 //sifreleme
-
-
-
 
 //3.Adim model olustur
 
 const User = new mongoose.model("User", userSchema);
 
+passport.use(User.createStrategy());
+
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 app.get('/', function (req, res) {
     res.render("home");
@@ -57,52 +70,52 @@ app.get('/register', function (req, res) {
     res.render("register");
 });
 
+app.get('/secrets', function(req, res){
+    if (req.isAuthenticated()){
+        res.render('secrets');
+    }else {
+        res.redirect('/login');
+    }
+});
+
+
+app.get('/logout', function(req, res){
+    req.logout();
+    res.redirect('/');
+});
 //4.Adim register.ejs den post edilen veriyi yakalamak icin register route u olustr
 
 app.post("/register", function (req, res) {
 
-    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-        // Store hash in your password DB.
-
-        const newUser = new User({
-            email: req.body.username,
-            password: hash
-        });
-    
-        newUser.save(function (err) {
-            if (err) {
-                console.log(err);
-            } else {
-                res.render("secrets");
-            }
-        });
+    User.register({username: req.body.username}, req.body.password, function (err, user) {
+        if (err) {
+            console.log(err);
+            res.redirect('/register');
+        } else {
+            passport.authenticate('local')(req, res, function(){
+                res.redirect('/secrets');
+            });
+        }
     });
-
-   
 });
 
 
 //5.Adim Register yapildi login yapilirken DB deki veriler ile girilen veriler kiyaslanmasi icin login route olusturulur
 app.post("/login", function (req, res) {
-    const username = req.body.username;
-    const password = req.body.password;
-
-    //kiyaslama kodumuzu yaziyoruz
-    User.findOne({email: username}, function (err, foundUser) {
+    const user = new User({
+        username:req.body.username,
+        password:req.body.password
+    });
+    req.login(user, function(err){
         if (err) {
             console.log(err);
-        } else {
-            if (foundUser) {
-                bcrypt.compare(password, foundUser.password, function(err,result) {
-                    if (result === true) {
-                        res.render('secrets');
-                    }
-                });    
-                   
-                
-            }
+        }else {
+            passport.authenticate('local')(req, res, function(){
+                res.redirect('/secrets');
+            });
         }
-    });
+    })
+
 });
 
 
